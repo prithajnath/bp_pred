@@ -6,28 +6,23 @@ import pandas as pd
 
 DATA_DIR = Path("data")
 
-# Fields that are stored as uint16 ASCII char arrays in the HDF5 refs
 STRING_FIELDS = {"SubjectID", "CaseID"}
-# Field whose scalar value is an ASCII char code (77='M', 70='F')
 CHAR_FIELDS = {"Gender"}
 
 
-def decode_ref(ref, f: h5py.File):
-    """Dereference one HDF5 object reference and return a Python scalar, string, or list."""
-    ds = f[ref]
-    val = ds[()]
-
-    # String stored as uint16 char array
-    if ds.dtype == np.uint16 and val.size > 1:
-        return "".join(chr(c) for c in val.flatten())
-
-    # Scalar
-    if val.size == 1:
-        raw = val.flat[0]
-        return float(raw) if ds.dtype.kind == "f" else int(raw)
-
-    # Array (time-series or variable-length peaks/turns)
-    return val.flatten().tolist()
+def infer_field_types(sw: h5py.Group, f: h5py.File) -> dict[str, str]:
+    """Determine 'string', 'scalar', or 'array' for each field using window 0."""
+    types = {}
+    for field in sw.keys():
+        ref = sw[field][0, 0]
+        ds = f[ref]
+        if ds.dtype == np.uint16:
+            types[field] = "string"
+        elif ds.shape == (1, 1):
+            types[field] = "scalar"
+        else:
+            types[field] = "array"
+    return types
 
 
 def convert(mat_path: Path):
@@ -37,16 +32,27 @@ def convert(mat_path: Path):
         sw = f["Subj_Wins"]
         fields = list(sw.keys())
         n_wins = sw[fields[0]].shape[1]
+        field_types = infer_field_types(sw, f)
 
         rows = []
         for i in range(n_wins):
             row = {}
             for field in fields:
-                ref = sw[field][0, i]
-                value = decode_ref(ref, f)
-                if field in CHAR_FIELDS and isinstance(value, int):
-                    value = chr(value)
-                row[field] = value
+                ds = f[sw[field][0, i]]
+                val = ds[()].flatten()
+                ftype = field_types[field]
+
+                if ftype == "string":
+                    row[field] = "".join(chr(c) for c in val)
+                elif ftype == "scalar":
+                    raw = val[0]
+                    if field in CHAR_FIELDS:
+                        row[field] = chr(int(raw))
+                    else:
+                        row[field] = float(raw) if ds.dtype.kind == "f" else int(raw)
+                else:
+                    row[field] = val.tolist()
+
             rows.append(row)
 
     df = pd.DataFrame(rows)
