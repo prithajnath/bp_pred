@@ -5,6 +5,10 @@ build/
 dist/
 wheels/
 *.egg-info
+*.zip.*
+*.parquet
+*.mat
+data*
 
 # Virtual environments
 .venv
