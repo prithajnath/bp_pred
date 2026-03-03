@@ -9,6 +9,7 @@ wheels/
 *.parquet
 *.mat
 data*
+blood-pressure-prediction-ml-28274a212118.json
 
 # Virtual environments
 .venv

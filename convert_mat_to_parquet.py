@@ -1,83 +1,58 @@
-import os
-import warnings
 from pathlib import Path
 
+import h5py
 import numpy as np
 import pandas as pd
-import scipy.io as sio
 
-DATA_DIR = Path("data/pulsedb-balanced-training-and-testing")
+DATA_DIR = Path("data")
 
-
-def load_mat(path: Path) -> dict:
-    """Load a .mat file, handling both legacy and v7.3 (HDF5) formats."""
-    try:
-        mat = sio.loadmat(path)
-        return {k: v for k, v in mat.items() if not k.startswith("_")}
-    except NotImplementedError:
-        import mat73
-        return mat73.loadmat(str(path))
+# Fields that are stored as uint16 ASCII char arrays in the HDF5 refs
+STRING_FIELDS = {"SubjectID", "CaseID"}
+# Field whose scalar value is an ASCII char code (77='M', 70='F')
+CHAR_FIELDS = {"Gender"}
 
 
-def flatten(obj, prefix="") -> dict[str, np.ndarray]:
-    """Recursively flatten nested dicts into {dotted.key: array} pairs."""
-    out = {}
-    if isinstance(obj, dict):
-        for k, v in obj.items():
-            out.update(flatten(v, f"{prefix}.{k}" if prefix else k))
-    elif isinstance(obj, np.ndarray):
-        out[prefix] = obj
-    else:
-        out[prefix] = np.asarray(obj)
-    return out
+def decode_ref(ref, f: h5py.File):
+    """Dereference one HDF5 object reference and return a Python scalar, string, or list."""
+    ds = f[ref]
+    val = ds[()]
 
+    # String stored as uint16 char array
+    if ds.dtype == np.uint16 and val.size > 1:
+        return "".join(chr(c) for c in val.flatten())
 
-def to_dataframe(arr: np.ndarray) -> pd.DataFrame:
-    if arr.ndim == 1:
-        return pd.DataFrame({"value": arr})
-    elif arr.ndim == 2:
-        return pd.DataFrame(arr)
-    else:
-        raise ValueError(f"Cannot convert array with {arr.ndim} dims to DataFrame")
+    # Scalar
+    if val.size == 1:
+        raw = val.flat[0]
+        return float(raw) if ds.dtype.kind == "f" else int(raw)
 
-
-def save_value(value, out_path: Path, label: str):
-    """Save a value (array or nested dict) to parquet file(s)."""
-    if isinstance(value, dict):
-        leaves = flatten(value)
-        arrays = {k: v for k, v in leaves.items() if isinstance(v, np.ndarray) and v.ndim <= 2}
-        if arrays:
-            # Try to combine into one DataFrame if shapes match
-            shapes = {v.shape[0] if v.ndim > 0 else 1 for v in arrays.values()}
-            if len(shapes) == 1:
-                df = pd.DataFrame({k: (v if v.ndim == 1 else list(v)) for k, v in arrays.items()})
-                df.to_parquet(out_path, index=False)
-                print(f"  -> {out_path.name} ({len(arrays)} fields, {df.shape[0]} rows)")
-            else:
-                # Shapes differ — save each leaf separately
-                for k, arr in arrays.items():
-                    leaf_path = out_path.with_name(out_path.stem + f"_{k.replace('.', '_')}.parquet")
-                    to_dataframe(arr).to_parquet(leaf_path, index=False)
-                    print(f"  -> {leaf_path.name} {arr.shape}")
-    else:
-        arr = np.asarray(value)
-        try:
-            to_dataframe(arr).to_parquet(out_path, index=False)
-            print(f"  -> {out_path.name} {arr.shape}")
-        except ValueError as e:
-            warnings.warn(f"Skipping '{label}': {e}")
+    # Array (time-series or variable-length peaks/turns)
+    return val.flatten().tolist()
 
 
 def convert(mat_path: Path):
-    print(f"Loading {mat_path.name} ...")
-    data = load_mat(mat_path)
+    out_path = mat_path.with_suffix(".parquet")
 
-    for key, value in data.items():
-        out_path = mat_path.with_name(f"{mat_path.stem}_{key}.parquet")
-        save_value(value, out_path, key)
+    with h5py.File(mat_path, "r") as f:
+        sw = f["Subj_Wins"]
+        fields = list(sw.keys())
+        n_wins = sw[fields[0]].shape[1]
 
+        rows = []
+        for i in range(n_wins):
+            row = {}
+            for field in fields:
+                ref = sw[field][0, i]
+                value = decode_ref(ref, f)
+                if field in CHAR_FIELDS and isinstance(value, int):
+                    value = chr(value)
+                row[field] = value
+            rows.append(row)
+
+    df = pd.DataFrame(rows)
+    df.to_parquet(out_path, index=False)
     mat_path.unlink()
-    print(f"Deleted {mat_path.name}")
+    print(f"{mat_path.name} -> {out_path.name} ({n_wins} windows)")
 
 
 if __name__ == "__main__":

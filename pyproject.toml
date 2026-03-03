@@ -16,4 +16,7 @@ dependencies = [
     "scipy>=1.17.1",
     "torch>=2.10.0",
     "tqdm>=4.67.3",
+    "google-api-python-client>=2.0.0",
+    "google-auth>=2.0.0",
+    "google-auth-httplib2>=0.2.0",
 ]
