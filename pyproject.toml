@@ -19,4 +19,6 @@ dependencies = [
     "google-api-python-client>=2.0.0",
     "google-auth>=2.0.0",
     "google-auth-httplib2>=0.2.0",
+    "matplotlib>=3.10.8",
+    "seaborn>=0.13.2",
 ]
