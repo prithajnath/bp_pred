@@ -10,6 +10,7 @@ wheels/
 *.mat
 data*
 blood-pressure-prediction-ml-28274a212118.json
+*.pt
 
 # Virtual environments
 .venv

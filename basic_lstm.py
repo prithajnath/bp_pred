@@ -1,15 +1,13 @@
-import numpy as np
-import pandas as pd
 from glob import glob
 
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import seaborn as sns
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.utils.data import TensorDataset, Dataset, DataLoader, random_split
-
-import matplotlib.pyplot as plt
-import seaborn as sns
-
+from torch.utils.data import DataLoader, TensorDataset, random_split
 
 DATA_DIR = "data"
 
@@ -26,17 +24,20 @@ def classify_raw_abp(abp: float):
         return 2
 
 
-abp_classified = df["ABP_Raw"].apply(
-    lambda raw_bp_seq: [classify_raw_abp(i) for i in raw_bp_seq]
-)
-
 X = np.stack(df["PPG_F"].values, dtype=np.float32)
-y = np.stack(abp_classified, dtype=np.float32)
+y = np.stack(df["ABP_Raw"].values, dtype=np.float32)
+
+# Normalize
+n_train = int(0.8 * len(X))
+X_mean, X_std = X[:n_train].mean(), X[:n_train].std()
+y_mean, y_std = y[:n_train].mean(), y[:n_train].std()
+
+X = (X - X_mean) / X_std
+y = (y - y_mean) / y_std
 
 full_dataset = TensorDataset(torch.from_numpy(X), torch.from_numpy(y))
 
 # 80/20 split
-n_train = int(0.8 * len(full_dataset))
 train_dataset, test_dataset = random_split(
     full_dataset,
     [n_train, len(full_dataset) - n_train],
@@ -54,14 +55,13 @@ test_loader = DataLoader(
 )
 
 
-class LSTMClassifier(nn.Module):
-    def __init__(self, input_dim, hidden_dim, output_dim, num_layers, dropout):
+class LSTM(nn.Module):
+    def __init__(self, input_dim, hidden_dim, num_layers, dropout):
 
         super().__init__()
 
         self.input_dim = input_dim
         self.hidden_dim = hidden_dim
-        self.output_dim = output_dim
         self.num_layers = num_layers
 
         self.lstm = nn.LSTM(
@@ -72,36 +72,33 @@ class LSTMClassifier(nn.Module):
             batch_first=True,
         )
 
-        # output
-        # 0, 1, 2
-        self.fc = nn.Linear(hidden_dim, output_dim)
+        self.fc = nn.Linear(hidden_dim, 1)
 
     def forward(self, ppg):
 
-        output, (hidden, cell) = self.lstm(ppg)
+        output, _ = self.lstm(ppg)
 
-        # output: (seq len, batch, hidden dim)
-        return self.fc(output)
+        # squeeze out last dim -> (batch, seq_len)
+        return self.fc(output).squeeze(-1)
 
 
 if __name__ == "__main__":
 
-    lstm_model = LSTMClassifier(
+    lstm_model = LSTM(
         input_dim=1,
         hidden_dim=128,
         num_layers=2,
-        output_dim=3,
         dropout=0.3,
     )
 
-    device = "mps"
+    device = "cuda" if torch.cuda.is_available() else "mps"
     lstm_model.to(device)
     lr = 0.0001
 
     optimizer = optim.Adam(lstm_model.parameters(), lr=lr)
-    criterion = nn.CrossEntropyLoss()
+    criterion = nn.HuberLoss()
 
-    NUM_EPOCHS = 100
+    NUM_EPOCHS = 10
 
     trace = {"train_loss": [], "val_loss": []}
     lstm_model.train()
@@ -117,9 +114,7 @@ if __name__ == "__main__":
             # lstm expects (batch, seq_len, 1), we have (batch, seq_len)
             outputs = lstm_model(seqs.unsqueeze(-1))
 
-            # output is (batch, seq_len, 3)
-            # CE wants (batch, 3, seq_len)
-            loss = criterion(outputs.permute(0, 2, 1), bps)
+            loss = criterion(outputs, bps)
             loss.backward()
 
             optimizer.step()
@@ -133,7 +128,43 @@ if __name__ == "__main__":
 
         train_loss = running_loss / len(train_loader)
         trace["train_loss"].append(train_loss)
-        print(f"Epoch {epoch + 1}/{NUM_EPOCHS} | train_loss={train_loss:.4f}")
 
-    sns.lineplot(x=range(NUM_EPOCHS), y=trace["train_loss"])
-    plt.savefig("lstm_train_loss.png")
+        # Validation
+        lstm_model.eval()
+        val_loss = 0
+        with torch.no_grad():
+            for seqs, bps in test_loader:
+                seqs, bps = seqs.to(device), bps.to(device)
+                outputs = lstm_model(seqs.unsqueeze(-1))
+                loss = criterion(outputs, bps)
+                val_loss += loss.item()
+        val_loss /= len(test_loader)
+        trace["val_loss"].append(val_loss)
+        lstm_model.train()
+
+        print(
+            f"Epoch {epoch + 1}/{NUM_EPOCHS} | train_loss={train_loss:.4f} | val_loss={val_loss:.4f}"
+        )
+
+    torch.save(
+        {
+            "model_state": lstm_model.state_dict(),
+            "X_mean": float(X_mean),
+            "X_std": float(X_std),
+            "y_mean": float(y_mean),
+            "y_std": float(y_std),
+        },
+        "lstm_checkpoint.pt",
+    )
+    print("Saved lstm_checkpoint.pt")
+
+    # train vs val loss
+    epochs = range(NUM_EPOCHS)
+    fig, ax = plt.subplots()
+    sns.lineplot(x=epochs, y=trace["train_loss"], ax=ax, label="train")
+    sns.lineplot(x=epochs, y=trace["val_loss"], ax=ax, label="val")
+    ax.set_xlabel("Epoch")
+    ax.set_ylabel("Loss")
+    ax.set_title("Train vs Validation Loss")
+    plt.savefig("lstm_train_val_loss.png")
+    plt.close()
