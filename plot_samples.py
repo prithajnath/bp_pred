@@ -2,7 +2,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 
-from basic_lstm import LSTM, test_dataset, y_mean, y_std
+from basic_lstm import LSTM
+from data_loader import test_dataset, y_mean, y_std
 
 CHECKPOINT = "lstm_checkpoint.pt"
 N_SAMPLES = 5

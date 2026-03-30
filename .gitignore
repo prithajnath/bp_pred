@@ -8,7 +8,7 @@ wheels/
 *.zip.*
 *.parquet
 *.mat
-data*
+data/*
 blood-pressure-prediction-ml-28274a212118.json
 *.pt
 

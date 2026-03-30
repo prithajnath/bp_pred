@@ -1,57 +1,16 @@
-from glob import glob
-
 import matplotlib.pyplot as plt
-import numpy as np
-import pandas as pd
 import seaborn as sns
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.utils.data import DataLoader, TensorDataset, random_split
 
-DATA_DIR = "data"
-
-dfs = [pd.read_parquet(f) for f in glob(f"{DATA_DIR}/*.parquet")]
-df = pd.concat(dfs, ignore_index=True)
-
-
-def classify_raw_abp(abp: float):
-    if abp <= 90:
-        return 0
-    if 90 < abp <= 130:
-        return 1
-    if abp > 130:
-        return 2
-
-
-X = np.stack(df["PPG_F"].values, dtype=np.float32)
-y = np.stack(df["ABP_Raw"].values, dtype=np.float32)
-
-# Normalize
-n_train = int(0.8 * len(X))
-X_mean, X_std = X[:n_train].mean(), X[:n_train].std()
-y_mean, y_std = y[:n_train].mean(), y[:n_train].std()
-
-X = (X - X_mean) / X_std
-y = (y - y_mean) / y_std
-
-full_dataset = TensorDataset(torch.from_numpy(X), torch.from_numpy(y))
-
-# 80/20 split
-train_dataset, test_dataset = random_split(
-    full_dataset,
-    [n_train, len(full_dataset) - n_train],
-    generator=torch.Generator().manual_seed(42),
-)
-
-batch_size = 3
-
-train_loader = DataLoader(
-    train_dataset, batch_size=batch_size, shuffle=True, num_workers=0
-)
-
-test_loader = DataLoader(
-    test_dataset, batch_size=batch_size, shuffle=False, num_workers=0
+from data_loader import (
+    X_mean,
+    X_std,
+    train_loader,
+    val_loader,
+    y_mean,
+    y_std,
 )
 
 
@@ -133,12 +92,12 @@ if __name__ == "__main__":
         lstm_model.eval()
         val_loss = 0
         with torch.no_grad():
-            for seqs, bps in test_loader:
+            for seqs, bps in val_loader:
                 seqs, bps = seqs.to(device), bps.to(device)
                 outputs = lstm_model(seqs.unsqueeze(-1))
                 loss = criterion(outputs, bps)
                 val_loss += loss.item()
-        val_loss /= len(test_loader)
+        val_loss /= len(val_loader)
         trace["val_loss"].append(val_loss)
         lstm_model.train()
 
