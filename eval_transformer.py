@@ -82,7 +82,7 @@ def eval_basic():
 print("Evaluating NLD transformer (2-min windows)...")
 nld_sbp_err, nld_dbp_err, nld_cm = eval_nld()
 
-print("Evaluating basic transformer (10s windows)...")
+print("Evaluating basic transformer (2-min windows)...")
 basic_sbp_err, basic_dbp_err, basic_cm = eval_basic()
 
 for name, sbp_e, dbp_e, cm in [
