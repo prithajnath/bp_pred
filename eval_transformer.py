@@ -49,8 +49,6 @@ def eval_nld():
 
 
 #  basic transformer (2-min PPG only)
-
-
 def eval_basic():
     ckpt = torch.load(BASIC_CHECKPOINT, map_location=device, weights_only=False)
     model = BasicTransformer(d_model=128, num_heads=4, num_layers=4, dropout=0.0)
@@ -87,11 +85,10 @@ nld_sbp_err, nld_dbp_err, nld_cm = eval_nld()
 print("Evaluating basic transformer (10s windows)...")
 basic_sbp_err, basic_dbp_err, basic_cm = eval_basic()
 
-# Print metrics
 for name, sbp_e, dbp_e, cm in [
     ("Basic transformer (PPG only)", basic_sbp_err, basic_dbp_err, basic_cm),
     ("NLD transformer  (PPG + Poincaré)", nld_sbp_err, nld_dbp_err, nld_cm),
 ]:
-    print(f"\n── {name} ──")
+    print(f"── {name} ──")
     print(f"SBP MAE: {np.mean(sbp_e):.2f} ± {np.std(sbp_e):.2f} mmHg")
     print(f"DBP MAE: {np.mean(dbp_e):.2f} ± {np.std(dbp_e):.2f} mmHg")
