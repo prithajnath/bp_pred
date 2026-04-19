@@ -84,7 +84,7 @@ class MultiHeadAttention(nn.Module):
 
 class PPGDownsampler(nn.Module):
     """
-    15000 -[stride 5]-> 3000 -[stride 5]-> 600 -[stride 4]-> 150
+    15000 -[k=10,s=5,p=3]-> 3000 -[k=12,s=6,p=3]-> 500
     """
 
     def __init__(self, d_model):
@@ -103,8 +103,8 @@ class PPGDownsampler(nn.Module):
     def forward(self, x):
         # x: (batch, 15000)
         x = x.unsqueeze(1)  # (batch, 1, 15000)
-        x = self.net(x)  # (batch, d_model, 150)
-        return x.permute(0, 2, 1)  # (batch, 150, d_model)
+        x = self.net(x)  # (batch, d_model, 500)
+        return x.permute(0, 2, 1)  # (batch, 500, d_model)
 
 
 class PoincareCNN(nn.Module):
@@ -164,21 +164,17 @@ class TransformerEncoderLayer(nn.Module):
         return x
 
 
-# 150 PPG tokens -> 12 sub-window predictions by folding groups of 12.5 -> use
-# a learned linear to pool from 150 to 12 sub-window embeddings.
-
 
 class DualStreamTransformer(nn.Module):
     """
 
-    Stream 1: 15,000-sample PPG -> CNN downsampler -> 150 tokens
+    Stream 1: 15,000-sample PPG -> CNN downsampler -> 500 tokens
     Stream 2: 4 Poincaré images -> CNN sequence encoder -> 4 tokens
 
-    The 154-token sequence is processed by a transformer encoder.
-    The 150 PPG output tokens are pooled to 12 sub-window embeddings,
-    each predicting SBP and DBP for the corresponding 10s window.
+    The 504-token sequence is processed by a transformer encoder.
+    Global average pool over all tokens -> Linear(d_model, 2).
 
-    Output: (batch, 12, 2)  — [SBP, DBP] per sub-window
+    Output: (batch, 2)  — mean [SBP, DBP] over the 2-minute window
     """
 
     def __init__(self, d_model=128, num_heads=4, num_layers=4, dropout=0.1):
@@ -188,7 +184,7 @@ class DualStreamTransformer(nn.Module):
 
         self.poincare_encoder = PoincareSequenceEncoder(d_model)
 
-        # Positional encoding over the full 154-token sequence
+        # Positional encoding over the full 504-token sequence
         self.pos_encoding = PositionalEncoding(
             d_model, dropout, max_len=NUM_PPG_TOKENS + NUM_POINCARE + 10
         )
@@ -208,19 +204,19 @@ class DualStreamTransformer(nn.Module):
         # ppg_seq:      (batch, 15000)
         # poincare_seq: (batch, 4, 1, 32, 32)
 
-        ppg_tokens = self.ppg_downsampler(ppg_seq)  # (batch, 150, d_model)
+        ppg_tokens = self.ppg_downsampler(ppg_seq)  # (batch, 500, d_model)
         poincare_tokens = self.poincare_encoder(poincare_seq)  # (batch, 4,   d_model)
 
         # Poincaré tokens first (low-freq context), then PPG tokens
         tokens = torch.cat(
             [poincare_tokens, ppg_tokens], dim=1
-        )  # (batch, 154, d_model)
+        )  # (batch, 504, d_model)
         tokens = self.pos_encoding(tokens)
 
         for layer in self.transformer:
             tokens = layer(tokens)
 
-        # Global average pool over all 154 tokens → (batch, d_model)
+        # Global average pool over all 504 tokens → (batch, d_model)
         pooled = tokens.mean(dim=1)
 
         return self.bp_head(pooled)  # (batch, 2)
