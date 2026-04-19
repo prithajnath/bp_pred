@@ -1,10 +1,11 @@
+import os
 from pathlib import Path
 
 import h5py
 import numpy as np
 import pandas as pd
 
-DATA_DIR = Path("data")
+DATA_DIR = Path(os.getenv("DATA_DIR", "data")) or Path("data")
 
 STRING_FIELDS = {"SubjectID", "CaseID"}
 CHAR_FIELDS = {"Gender"}

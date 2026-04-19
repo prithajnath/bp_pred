@@ -1,13 +1,15 @@
 import argparse
 import asyncio
 import os
+
 import aiohttp
-from tqdm import tqdm
-from google.oauth2 import service_account
 import google.auth.transport.requests
+from google.oauth2 import service_account
+from tqdm import tqdm
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(SCRIPT_DIR, "data")
+# DATA_DIR = "/media/prithaj/external_1t/bp_prediction_data"  # --- EDIT THIS TO YOUR LOCAL PATH ---
 CREDENTIALS_FILE = os.path.join(
     SCRIPT_DIR, "blood-pressure-prediction-ml-28274a212118.json"
 )
@@ -56,7 +58,14 @@ def get_access_token():
 
 
 async def download_file(
-    session, file_id, filename, remote_size, token, semaphore, overall_bar, max_retries=3
+    session,
+    file_id,
+    filename,
+    remote_size,
+    token,
+    semaphore,
+    overall_bar,
+    max_retries=3,
 ):
     url = f"https://www.googleapis.com/drive/v3/files/{file_id}?alt=media"
 
