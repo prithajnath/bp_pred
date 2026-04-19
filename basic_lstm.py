@@ -4,14 +4,8 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 
-from data_loader import (
-    X_mean,
-    X_std,
-    train_loader,
-    val_loader,
-    y_mean,
-    y_std,
-)
+from data_loader import X_mean, X_std, train_loader, val_loader, y_mean, y_std
+from utils import PPGDownsampler
 
 
 class LSTM(nn.Module):
@@ -23,6 +17,8 @@ class LSTM(nn.Module):
         self.hidden_dim = hidden_dim
         self.num_layers = num_layers
 
+        self.ppg_downsampler = PPGDownsampler(d_model=hidden_dim)
+
         self.lstm = nn.LSTM(
             input_size=input_dim,
             hidden_size=hidden_dim,
@@ -31,49 +27,55 @@ class LSTM(nn.Module):
             batch_first=True,
         )
 
-        self.fc = nn.Linear(hidden_dim, 1)
+        self.fc = nn.Linear(hidden_dim, 2)
 
     def forward(self, ppg):
 
-        output, _ = self.lstm(ppg)
+        ppg = self.ppg_downsampler(ppg)  # (batch, 500, hidden_dim)
 
-        # squeeze out last dim -> (batch, seq_len)
-        return self.fc(output).squeeze(-1)
+        output, _ = self.lstm(ppg)  # (batch, seq_len, hidden_dim)
+        # we have (batch, seq_len, 2)
+        # we want (batch, 2) before passing it to the linear layer
+        return self.fc(output.mean(dim=1)).squeeze(-1)
 
 
 if __name__ == "__main__":
 
     lstm_model = LSTM(
-        input_dim=1,
+        input_dim=128,
         hidden_dim=128,
         num_layers=2,
         dropout=0.3,
     )
 
     device = "cuda" if torch.cuda.is_available() else "mps"
+    # device = "cpu"
     lstm_model.to(device)
     lr = 0.0001
 
     optimizer = optim.Adam(lstm_model.parameters(), lr=lr)
     criterion = nn.HuberLoss()
 
-    NUM_EPOCHS = 10
+    NUM_EPOCHS = 100
+    EARLY_STOP_PATIENCE = 25
 
     trace = {"train_loss": [], "val_loss": []}
+    best_val_loss = float("inf")
+    epochs_without_improvement = 0
+
     lstm_model.train()
 
     for epoch in range(NUM_EPOCHS):
 
         running_loss = 0
 
-        for batch_idx, (seqs, bps) in enumerate(train_loader):
-            seqs, bps = seqs.to(device), bps.to(device)
+        for batch_idx, (ppg_seqs, poincare_imgs, abps) in enumerate(train_loader):
+            seqs, abps = ppg_seqs.to(device), abps.to(device)
 
             optimizer.zero_grad()
-            # lstm expects (batch, seq_len, 1), we have (batch, seq_len)
-            outputs = lstm_model(seqs.unsqueeze(-1))
+            outputs = lstm_model(seqs)
 
-            loss = criterion(outputs, bps)
+            loss = criterion(outputs, abps)
             loss.backward()
 
             optimizer.step()
@@ -92,33 +94,45 @@ if __name__ == "__main__":
         lstm_model.eval()
         val_loss = 0
         with torch.no_grad():
-            for seqs, bps in val_loader:
-                seqs, bps = seqs.to(device), bps.to(device)
-                outputs = lstm_model(seqs.unsqueeze(-1))
-                loss = criterion(outputs, bps)
+            for ppg_seqs, poincare_imgs, abps in val_loader:
+                seqs, abps = ppg_seqs.to(device), abps.to(device)
+                outputs = lstm_model(seqs)
+                loss = criterion(outputs, abps)
                 val_loss += loss.item()
         val_loss /= len(val_loader)
         trace["val_loss"].append(val_loss)
+
+        if val_loss < best_val_loss:
+            best_val_loss = val_loss
+            epochs_without_improvement = 0
+            torch.save(
+                {
+                    "model_state": lstm_model.state_dict(),
+                    "X_mean": float(X_mean),
+                    "X_std": float(X_std),
+                    "y_mean": y_mean.tolist(),
+                    "y_std": y_std.tolist(),
+                },
+                "lstm_checkpoint.pt",
+            )
+
+            print(f"Saved best model (val_loss={best_val_loss:.4f})")
+        else:
+            epochs_without_improvement += 1
+            if epochs_without_improvement >= EARLY_STOP_PATIENCE:
+                print(
+                    f"Early stopping triggered after {epoch + 1} epochs with no improvement."
+                )
+                break
+
         lstm_model.train()
 
         print(
             f"Epoch {epoch + 1}/{NUM_EPOCHS} | train_loss={train_loss:.4f} | val_loss={val_loss:.4f}"
         )
 
-    torch.save(
-        {
-            "model_state": lstm_model.state_dict(),
-            "X_mean": float(X_mean),
-            "X_std": float(X_std),
-            "y_mean": float(y_mean),
-            "y_std": float(y_std),
-        },
-        "lstm_checkpoint.pt",
-    )
-    print("Saved lstm_checkpoint.pt")
-
     # train vs val loss
-    epochs = range(NUM_EPOCHS)
+    epochs = range(len(trace["train_loss"]))
     fig, ax = plt.subplots()
     sns.lineplot(x=epochs, y=trace["train_loss"], ax=ax, label="train")
     sns.lineplot(x=epochs, y=trace["val_loss"], ax=ax, label="val")

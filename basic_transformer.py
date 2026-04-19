@@ -8,9 +8,9 @@ from data_loader import X_mean, X_std, train_loader, val_loader, y_mean, y_std
 from transformer_nld import (
     NUM_PPG_TOKENS,
     PositionalEncoding,
-    PPGDownsampler,
     TransformerEncoderLayer,
 )
+from utils import PPGDownsampler
 
 
 class BasicTransformer(nn.Module):

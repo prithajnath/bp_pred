@@ -58,11 +58,16 @@ However, since the data is sampled at 125 Hz, a 2-minute window contains 125 × 
 
 In addition to the PPG stream, we extract 4 Poincaré plots (one per 30s sub-window) as a second input stream. Each plot is a 32×32 density histogram of successive RR intervals, encoding sympatho-vagal balance, and is processed by a small CNN before being concatenated with the PPG tokens
 
-## Transformer results
+## Results
 
-Run the `eval_transformer.py` file to run the trained models on the test set
+Run the `eval_transformer.py` file to run the trained transformer models on the test set, and run the `eval_lstm.py` to run the LSTM model on the test set.
+
+Here are the combined results
 
 ```
+── LSTM (PPG only) ──
+SBP MAE: 20.54 ± 11.52 mmHg
+DBP MAE: 15.88 ± 8.70 mmHg
 ── Basic transformer (PPG only) ──
 SBP MAE: 15.35 ± 9.70 mmHg
 DBP MAE: 9.38 ± 5.40 mmHg
@@ -70,6 +75,18 @@ DBP MAE: 9.38 ± 5.40 mmHg
 SBP MAE: 14.07 ± 9.37 mmHg
 DBP MAE: 7.75 ± 5.84 mmHg
 
+GOAL:
+── RNN (from paper, PPG only) ──
+SBP MAE: 14.39 mmHg
+DBP MAE: 6.57 mmHg
+
 ```
 
-Our goal was to predict BP calibration-free purely on PPG data. The benchmark in the paper for that is an SBP MAE of 14.39 mmHg and a DBP MAE of 6.57 mmHg. Our NLD transformer beat the systollic benchmark and came close to beating the diastolic benchmark (slightly worse).
+| Model | SBP MAE (mmHg) | DBP MAE (mmHg) |
+|---|---|---|
+| LSTM (PPG only) | 20.54 ± 11.52 | 15.88 ± 8.70 |
+| Basic Transformer (PPG only) | 15.35 ± 9.70 | 9.38 ± 5.40 |
+| NLD Transformer (PPG + Poincaré) | **14.07 ± 9.37** | **7.75 ± 5.84** |
+| Paper RNN baseline (PPG only) | 14.39 | 6.57 |
+
+Our goal was to predict BP calibration-free purely on PPG data. The benchmark in the paper for that is an SBP MAE of 14.39 mmHg and a DBP MAE of 6.57 mmHg. **Our NLD transformer beat the systollic benchmark** and came close to beating the diastolic benchmark (slightly worse).
