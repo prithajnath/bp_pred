@@ -52,9 +52,11 @@ All data processing is done by the `data_loader.py` file. It loads all parquet f
 1. 2-min windows of PPG sequence for every patient
 2. Train/Val/Test splits
 
-We want to train the model for calibration-free prediction, which means no subject in the training set is present in the testing set. The 2-min window was chosen because it preserves more of the morphology that is useful to predict BP than the default 10s window.
+We train for calibration-free prediction: no subject in the training set appears in the test set. The 2-minute window was chosen to capture autonomic nervous system dynamics — specifically the LF HRV band (Mayer waves, ~7-25s) which are physiologically linked to blood pressure via baroreceptor feedback, which are not observable in a 10s window.
 
-However, since the data is sampled at 125Hz, a 2-min window would contain 125 \* 120 = 15K observations. Attention scales quadratically so that would mean would would need to fit a 15K x 15K matrix in VRAM, which is not feasible. Therefore, we used a 1D-CNN to downsample the 2-min sequence from a 15000K length array to a 500 length array
+However, since the data is sampled at 125 Hz, a 2-minute window contains 125 × 120 = 15,000 samples. Self-attention scales quadratically with sequence length, so a 15,000-token sequence would require a 15,000 × 15,000 attention matrix — not feasible. We use a 1D CNN to downsample from 15,000 samples to 500 tokens before the transformer.
+
+In addition to the PPG stream, we extract 4 Poincaré plots (one per 30s sub-window) as a second input stream. Each plot is a 32×32 density histogram of successive RR intervals, encoding sympatho-vagal balance, and is processed by a small CNN before being concatenated with the PPG tokens
 
 ## Transformer results
 
