@@ -82,11 +82,75 @@ DBP MAE: 6.57 mmHg
 
 ```
 
-| Model | SBP MAE (mmHg) | DBP MAE (mmHg) |
-|---|---|---|
-| LSTM (PPG only) | 20.54 ± 11.52 | 15.88 ± 8.70 |
-| Basic Transformer (PPG only) | 15.35 ± 9.70 | 9.38 ± 5.40 |
+| Model                            | SBP MAE (mmHg)   | DBP MAE (mmHg)  |
+| -------------------------------- | ---------------- | --------------- |
+| LSTM (PPG only)                  | 20.54 ± 11.52    | 15.88 ± 8.70    |
+| Basic Transformer (PPG only)     | 15.35 ± 9.70     | 9.38 ± 5.40     |
 | NLD Transformer (PPG + Poincaré) | **14.07 ± 9.37** | **7.75 ± 5.84** |
-| Paper RNN baseline (PPG only) | 14.39 | 6.57 |
+| Paper RNN baseline (PPG only)    | 14.39            | 6.57            |
 
 Our goal was to predict BP calibration-free purely on PPG data. The benchmark in the paper for that is an SBP MAE of 14.39 mmHg and a DBP MAE of 6.57 mmHg. **Our NLD transformer beat the systollic benchmark** and came close to beating the diastolic benchmark (slightly worse).
+
+## NLD Transformer Architecture
+
+```
+=========================================================================================================
+Layer (type:depth-idx)                                  Output Shape              Param #
+=========================================================================================================
+DualStreamTransformer                                   [32, 2]                   --
+├─PPGDownsampler: 1-1                                   [32, 500, 128]            --
+│    └─Sequential: 2-1                                  [32, 128, 500]            --
+│    │    └─Conv1d: 3-1                                 [32, 32, 3000]            352
+│    │    └─GELU: 3-2                                   [32, 32, 3000]            --
+│    │    └─BatchNorm1d: 3-3                            [32, 32, 3000]            64
+│    │    └─Conv1d: 3-4                                 [32, 128, 500]            49,280
+│    │    └─GELU: 3-5                                   [32, 128, 500]            --
+│    │    └─BatchNorm1d: 3-6                            [32, 128, 500]            256
+├─PoincareSequenceEncoder: 1-2                          [32, 4, 128]              --
+│    └─PoincareCNN: 2-2                                 [128, 64]                 --
+│    │    └─Sequential: 3-7                             [128, 64]                 135,936
+│    └─Linear: 2-3                                      [32, 4, 128]              8,320
+├─PositionalEncoding: 1-3                               [32, 504, 128]            --
+│    └─Dropout: 2-4                                     [32, 504, 128]            --
+├─ModuleList: 1-4                                       --                        --
+│    └─TransformerEncoderLayer: 2-5                     [32, 504, 128]            --
+│    │    └─MultiHeadAttention: 3-8                     [32, 504, 128]            65,536
+│    │    └─Dropout: 3-9                                [32, 504, 128]            --
+│    │    └─LayerNorm: 3-10                             [32, 504, 128]            256
+│    │    └─Sequential: 3-11                            [32, 504, 128]            131,712
+│    │    └─Dropout: 3-12                               [32, 504, 128]            --
+│    │    └─LayerNorm: 3-13                             [32, 504, 128]            256
+│    └─TransformerEncoderLayer: 2-6                     [32, 504, 128]            --
+│    │    └─MultiHeadAttention: 3-14                    [32, 504, 128]            65,536
+│    │    └─Dropout: 3-15                               [32, 504, 128]            --
+│    │    └─LayerNorm: 3-16                             [32, 504, 128]            256
+│    │    └─Sequential: 3-17                            [32, 504, 128]            131,712
+│    │    └─Dropout: 3-18                               [32, 504, 128]            --
+│    │    └─LayerNorm: 3-19                             [32, 504, 128]            256
+│    └─TransformerEncoderLayer: 2-7                     [32, 504, 128]            --
+│    │    └─MultiHeadAttention: 3-20                    [32, 504, 128]            65,536
+│    │    └─Dropout: 3-21                               [32, 504, 128]            --
+│    │    └─LayerNorm: 3-22                             [32, 504, 128]            256
+│    │    └─Sequential: 3-23                            [32, 504, 128]            131,712
+│    │    └─Dropout: 3-24                               [32, 504, 128]            --
+│    │    └─LayerNorm: 3-25                             [32, 504, 128]            256
+│    └─TransformerEncoderLayer: 2-8                     [32, 504, 128]            --
+│    │    └─MultiHeadAttention: 3-26                    [32, 504, 128]            65,536
+│    │    └─Dropout: 3-27                               [32, 504, 128]            --
+│    │    └─LayerNorm: 3-28                             [32, 504, 128]            256
+│    │    └─Sequential: 3-29                            [32, 504, 128]            131,712
+│    │    └─Dropout: 3-30                               [32, 504, 128]            --
+│    │    └─LayerNorm: 3-31                             [32, 504, 128]            256
+├─Linear: 1-5                                           [32, 2]                   258
+=========================================================================================================
+Total params: 985,506
+Trainable params: 985,506
+Non-trainable params: 0
+Total mult-adds (Units.GIGABYTES): 1.04
+=========================================================================================================
+Input size (MB): 2.44
+Forward/backward pass size (MB): 833.95
+Params size (MB): 3.94
+Estimated Total Size (MB): 840.33
+=========================================================================================================
+```
