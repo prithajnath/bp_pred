@@ -40,7 +40,8 @@ PAPAGEI_EMBED_DIM = 512         # PaPaGei-S output embedding dimension
 
 # Download weights from https://zenodo.org/records/13983110
 # Place papagei_s.pt in papagei_weights/
-PAPAGEI_WEIGHTS = "papagei_weights/papagei_s.pt"
+# And make sure it's the right file path
+PAPAGEI_WEIGHTS = "Final Project/bp_pred/papagei_weights/papagei_s.pt"
 
 PAPAGEI_MODEL_CONFIG = {
     "base_filters": 32,
@@ -112,9 +113,9 @@ class PaPaGeiPPGEncoder(nn.Module):
         # (batch * 12, 1, 1250)
         x = windows.reshape(batch * NUM_PPG_TOKENS, 1, PPG_WINDOW_LEN)
  
-        # PaPaGei-S returns (embeddings, expert_outputs, gating_weights)
-        with torch.no_grad():
-            embeddings, _, _ = self.encoder(x)   # (batch*12, 512)
+        # PaPaGei-S returns
+        outputs = self.encoder(x)
+        embeddings = outputs[0]   # (batch*12, 512)
  
         # Restore batch and token dims, then project
         embeddings = embeddings.view(batch, NUM_PPG_TOKENS, PAPAGEI_EMBED_DIM)
