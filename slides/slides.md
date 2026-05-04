@@ -247,6 +247,16 @@ A **10-second** window captures heartbeat morphology — but blood pressure is r
 </div>
 </div>
 
+<!--
+The 2-minute window is justified by the physiology of baroreceptor feedback.
+
+Baroreceptors in the aortic arch and carotid sinus detect changes in arterial pressure and send signals to the autonomic nervous system. The ANS responds by adjusting heart rate — this creates periodic oscillations in RR intervals at roughly 0.04–0.15 Hz, which is the LF HRV band.
+
+These oscillations are what we see as Mayer waves: a slow amplitude modulation of the PPG signal with a period of about 7–25 seconds.
+
+To capture even one full Mayer wave cycle you need up to 25 seconds. To give the model enough cycles to learn the pattern from — and to reliably estimate LF HRV — you need at least 2 minutes. That's why the window length is what it is.
+-->
+
 ---
 
 # Poincaré Plots as a Second Input
@@ -408,57 +418,66 @@ The model can't easily learn HRV dynamics from raw PPG alone — the CNN downsam
 
 </v-click>
 
+</div>
+</div>
+
+---
+
+# Limitations / Next Steps
+
+<div class="grid grid-cols-2 gap-8 mt-4">
+<div>
+
 <v-click>
 
-This is **architecture-level feature engineering** grounded in cardiovascular physiology.
+**Why we missed the DBP benchmark**
 
 </v-click>
 
+<v-clicks>
+
+- The CNN downsampler compresses 15,000 samples → 500 tokens (30× reduction) using strided convolution
+- This was necessary — self-attention over 15k tokens requires a 15,000 × 15,000 attention matrix, which isn't feasible
+- But it's lossy: features in the ~50–100ms range get averaged out
+- The **dicrotic notch** sits in exactly this range — its timing encodes vascular stiffness and pulse wave velocity, which are physiologically closer to DBP than SBP
+- This is likely why SBP improved more than DBP, and why DBP still trails the benchmark
+
+</v-clicks>
+
+</div>
+<div>
+
+<v-click>
+
+**Next step: PapaGei embeddings**
+
+</v-click>
+
+<v-clicks>
+
+- PapaGei is a PPG foundation model pretrained on large-scale waveform data
+- It produces fixed-length embeddings that capture the full morphological signal — without requiring a hand-designed lossy downsampler
+- Swapping the CNN downsampler for PapaGei embeddings would give the transformer richer input, potentially recovering the dicrotic notch timing that DBP estimation depends on
+- This is the most promising path to closing the DBP gap
+
+</v-clicks>
+
 </div>
 </div>
+
+---
+
+# Proposed Architecture: PapaGei
+
+<PapaGeiViz />
 
 ---
 layout: center
 class: text-center
 ---
 
-# Key Takeaways
+# Thank You
 
-<div class="grid grid-cols-3 gap-6 mt-8 text-left">
-
-<v-click>
-<div class="p-4 border border-primary/30 rounded-lg bg-primary/5">
-
-**2-minute windows**  
-Capture autonomic nervous system dynamics invisible in shorter segments — necessary for calibration-free generalization.
-
-</div>
-</v-click>
-
-<v-click>
-<div class="p-4 border border-primary/30 rounded-lg bg-primary/5">
-
-**Poincaré plots**  
-Encoding sympatho-vagal balance as a second input stream gives the transformer a physiological prior it can't learn from raw PPG.
-
-</div>
-</v-click>
-
-<v-click>
-<div class="p-4 border border-primary/30 rounded-lg bg-primary/5">
-
-**Calibration-free**  
-No subject overlap between train and test. A harder, more realistic protocol — and we still beat the SBP benchmark.
-
-</div>
-</v-click>
-
-</div>
-
-<v-click>
-
-<div class="mt-10 text-sm opacity-60">
+<div class="mt-10 text-sm opacity-50">
   PulseDB · Wang et al. 2023 · Frontiers in Digital Health
 </div>
-
-</v-click>
