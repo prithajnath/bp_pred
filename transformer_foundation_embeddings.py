@@ -245,7 +245,7 @@ class DualStreamTransformer(nn.Module):
     Stream 1: 15,000-sample PPG -> PaPaGei foundation model -> 12 tokens
     Stream 2: 4 Poincaré images -> CNN sequence encoder -> 4 tokens
 
-    The 504-token sequence is processed by a transformer encoder.
+    The 16-token sequence is processed by a transformer encoder.
     Global average pool over all tokens -> Linear(d_model, 2).
 
     Output: (batch, 2)  — mean [SBP, DBP] over the 2-minute window
@@ -279,7 +279,7 @@ class DualStreamTransformer(nn.Module):
         # ppg_seq:      (batch, 15000)
         # poincare_seq: (batch, 4, 1, 32, 32)
 
-        ppg_tokens = self.ppg_encoder(ppg_seq)  # (batch, 500, d_model)
+        ppg_tokens = self.ppg_encoder(ppg_seq)  # (batch, 12, d_model)
         poincare_tokens = self.poincare_encoder(poincare_seq)  # (batch, 4,   d_model)
 
         # Poincaré tokens first (low-freq context), then PPG tokens
