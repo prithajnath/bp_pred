@@ -194,6 +194,7 @@ class PoincareCNN(nn.Module):
             nn.ReLU(),
             nn.MaxPool2d(2),  # 16->8
             nn.Flatten(),
+            nn.Dropout(0.4), # Adding in dropout here since PaPaGei is frozen
             nn.Linear(32 * 8 * 8, out_features),
             nn.ReLU(),
         )
@@ -298,10 +299,10 @@ class DualStreamTransformer(nn.Module):
 
 
 model = DualStreamTransformer(
-    d_model=128,
+    d_model=64, # Reduce model params due to overfitting
     num_heads=4,
-    num_layers=4,
-    dropout=0.3,
+    num_layers=2, # Reducing layers to possibly help with overfitting
+    dropout=0.4, # Increase to hopefully help with overfitting
 )
 if __name__ == "__main__":
 
@@ -313,7 +314,7 @@ if __name__ == "__main__":
     optimizer = optim.Adam(
         filter(lambda p: p.requires_grad, model.parameters()),
         lr=3e-5,
-        weight_decay=1e-4,
+        weight_decay=1e-3, # Increasing weight decay to help with overfitting (hopefully)
     )
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(
         optimizer, mode="min", factor=0.5, patience=3
