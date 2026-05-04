@@ -5,6 +5,7 @@ import h5py
 import numpy as np
 import pandas as pd
 
+# Set to my external drive holding the data
 DATA_DIR = Path(os.getenv("DATA_DIR", "D:\DL Data NEW")) or Path("data")
 
 STRING_FIELDS = {"SubjectID", "CaseID"}
@@ -17,6 +18,7 @@ def infer_field_types(sw: h5py.Group, f: h5py.File) -> dict[str, str]:
     for field in sw.keys():
         ref = sw[field][0, 0]
 
+        # ref would sometimes be a float, so set the type appropriately
         if not isinstance(ref, h5py.Reference):
             types[field] = "scalar"
             continue
@@ -44,11 +46,12 @@ def convert(mat_path: Path):
         for i in range(n_wins):
             row = {}
             for field in fields:
+                # Again because some ref fields were floats, had to adjust how cols were retrieved
                 col = min(i, sw[field].shape[1] - 1)
                 raw_ref = sw[field][0, col]
                 ftype = field_types[field]
 
-                # Direct numeric value — no dereferencing needed
+                # Direct numeric value
                 if not isinstance(raw_ref, h5py.Reference):
                     raw = raw_ref
                     if field in CHAR_FIELDS:

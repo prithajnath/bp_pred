@@ -8,6 +8,7 @@ import torch
 from scipy.signal import find_peaks
 from torch.utils.data import DataLoader, Dataset
 
+# Set to my external drive holding the data
 DATA_DIR = os.getenv("DATA_DIR", "D:/DL Data NEW")
 BATCH_SIZE = 32
 
@@ -94,6 +95,10 @@ class BPDataset(Dataset):
         df = _load_parquet(filepath)
         sub_df = df.iloc[row_indices]
 
+        # Used with NLD transformer
+        # ppg_windows = np.stack(sub_df["PPG_F"].values).astype(np.float32)  # (12, 1250)
+
+        # Used with foundation model transformer
         ppg_windows = np.stack(
             [np.asarray(x, dtype=np.float32).flatten() for x in sub_df["PPG_F"].values]
         )  # (12, 1250)
@@ -131,6 +136,7 @@ def compute_normalization_stats(file_list, sample_files=30):
         sbp_vals.extend(df["SegSBP"].values)
         dbp_vals.extend(df["SegDBP"].values)
         for row in df["PPG_F"].values[:10]:
+            # Flatten the input array
             ppg_vals.extend(np.asarray(row, dtype=np.float32).flatten())
 
     ppg_arr = np.array(ppg_vals, dtype=np.float32)

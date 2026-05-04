@@ -23,7 +23,7 @@ from data_loader import (
 # from utils import PPGDownsampler
 
 # PaPaGei imports — assumes the repo is cloned into ./papagei/
-# To clone the papagei repo: git clone https://github.com/Nokia-Bell-Labs/papagei-foundation-model papagei
+# To clone the papagei repo: git clone https://github.*/Nokia-Bell-Labs/papagei-foundation-model papagei
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "papagei"))
 from models.resnet import ResNet1DMoE
 from linearprobing.utils import load_model_without_module_prefix
