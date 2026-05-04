@@ -487,6 +487,10 @@ The model can't easily learn HRV dynamics from raw PPG alone — the CNN downsam
   <img src="/papagei_transformer_val_loss.png" class="rounded" style="max-height:360px;filter:invert(1) hue-rotate(180deg) brightness(0.85)" />
 </div>
 
+<!--
+Basically I tried unfreezing some layers of the trained PapaGei model to see if they could be retrained at all to help with overfitting. But overall it could be a data issue since I was having trouble getting all of it downloaded — I only got 415 parquet files after downloading.
+-->
+
 ---
 layout: center
 class: text-center
