@@ -186,7 +186,9 @@ Wang et al. 2023 — *Frontiers in Digital Health*
 </div>
 </div>
 
-<!-- Our dataset consists of ~5.2 million 10-second segments of PPG, ECG, and BP waveforms from ~5300 subjects. This is the largest prepared dataset for cuff-less BP measurement and comes "ready to go". We are using a subset of the data labeled as VitalDB, which are ICU surgical patients, which was split into training and test subjects (as on slide). Blood pressure measurement distributions are as such:-->
+<!-- Alex
+
+Our dataset consists of ~5.2 million 10-second segments of PPG, ECG, and BP waveforms from ~5300 subjects. This is the largest prepared dataset for cuff-less BP measurement and comes "ready to go". We are using a subset of the data labeled as VitalDB, which are ICU surgical patients, which was split into training and test subjects (as on slide). Blood pressure measurement distributions are as such:-->
 
 ---
 
@@ -386,7 +388,9 @@ A **Poincaré plot** plots each RR interval against the next one. Its shape enco
 </div>
 
 
-<!-- Our initial LSTM model did not do well at all, with very large Mean Absolute Errors that were nowhere close to the original paper's results (seen soon). Our basic transformer did much better than the LSTM model, but still not quite on the same level as the paper. Here are the paper results we were looking to do better than (lower is better). 
+<!-- Alex
+
+Our initial LSTM model did not do well at all, with very large Mean Absolute Errors that were nowhere close to the original paper's results (seen soon). Our basic transformer did much better than the LSTM model, but still not quite on the same level as the paper. Here are the paper results we were looking to do better than (lower is better). 
 
 The NLD transformer as seen here slightly outperformed the paper's RNN model at predicting systolic blood pressure (the upper number in a blood pressure measurement). This is impactful because we only trained on a subset of the data the paper used and was not calibrated at all, so it is possible we could get an even lower MAE value. However, diastolic blood pressure was not quite beating the paper's benchmark. DBP has a small variance, so it is more difficult to track in unseen/test-subset subjects. -->
 
@@ -398,7 +402,9 @@ The NLD transformer as seen here slightly outperformed the paper's RNN model at 
   <img src="/nld_transformer_val_loss.png" class="rounded" style="max-height:360px;filter:invert(1) hue-rotate(180deg) brightness(0.85)" />
 </div>
 
-<!-- Here we can see that our loss curves don't show immediate signs of over/under-fitting, further giving our model legs to stand on. Negligible drops in loss started occuring around epoch 12-15, and from there on it stayed around the same value. Our model was training until 25 epochs were met with little to no change in loss value, so we can arguably say that we only needed around 12-15 epochs to train our model since anything after that was not improving.-->
+<!-- Alex 
+
+Here we can see that our loss curves don't show immediate signs of over/under-fitting, further giving our model legs to stand on. Negligible drops in loss started occuring around epoch 12-15, and from there on it stayed around the same value. Our model was training until 25 epochs were met with little to no change in loss value, so we can arguably say that we only needed around 12-15 epochs to train our model since anything after that was not improving.-->
 
 ---
 
@@ -493,7 +499,9 @@ The model can't easily learn HRV dynamics from raw PPG alone — the CNN downsam
 </div>
 </div>
 
-<!-- The NLD model likely missed the paper's DBP benchmark due to how we had to compress the initial data. This data compression was a 30x reduction of sample sizes, for without the reduction our attention matrix would be far too large to feasibly compute and work with. This compression however results in features within ~50-100ms being averaged out, and the data not having a large impact.
+<!-- Alex 
+
+The NLD model likely missed the paper's DBP benchmark due to how we had to compress the initial data. This data compression was a 30x reduction of sample sizes, for without the reduction our attention matrix would be far too large to feasibly compute and work with. This compression however results in features within ~50-100ms being averaged out, and the data not having a large impact.
 
 Notably, the dicrotic notch (whose timing is very useful in finding DBP) sits in this range that gets compressed. Important timing data was thus being compressed out of our data, and explains why our model missed the paper's benchmark.
 
@@ -517,7 +525,8 @@ We hope that by swapping the CNN downsampler with the PaPaGei pretrained model, 
   <img src="/papagei_transformer_val_loss.png" class="rounded" style="max-height:360px;filter:invert(1) hue-rotate(180deg) brightness(0.85)" />
 </div>
 
-<!--
+<!-- Alex
+
 I tried implementing the pretrained PaPaGei model into our work, but without much success to be had. As seen here, overfitting was occurring throughout training, so the results are not likely that useful. My thought to counteract this was to unfreeze some of the layers in the pretrained PaPaGei model, in case it was not working well with our data subset, but that did not seem to help much either. 
 
 It is possible that this could be a data quantity issue, as I perosnally was having some trouble downloading all of the data. I had hoped I had enough to accomplish some training, but it is possible I just need more of the data still. 
