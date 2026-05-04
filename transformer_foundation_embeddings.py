@@ -31,7 +31,7 @@ from linearprobing.utils import load_model_without_module_prefix
 FREQUENCY = 125  # Hz
 # SEQ_LEN = 15000  ( 12 * 1250)
 # NUM_POINCARE = 4
-# NUM_PPG_TOKENS = 500  # after 2-stage CNN downsampling: 15000 -> 3000 -> 500
+# NUM_PPG_TOKENS = 500  # after 2-stage CNN downsampling: 15000 -> 3000 -> 500 -- OLD
 
 # PaPaGei operates on 10-second windows at 125 Hz
 PPG_WINDOW_LEN = 1250           # samples per window (10s × 125Hz)
