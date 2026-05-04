@@ -19,7 +19,7 @@ background: /bg.gif
 From PPG signals using a dual-stream transformer
 
 <div class="abs-br m-6 text-sm opacity-50">
-  Prithaj Nath · 2026
+  Prithaj Nath, Alex Stute · 2026
 </div>
 
 ---
