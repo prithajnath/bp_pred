@@ -374,6 +374,14 @@ A **Poincaré plot** plots each RR interval against the next one. Its shape enco
 
 ---
 
+# Loss Curve
+
+<div class="flex justify-center mt-4">
+  <img src="/nld_transformer_val_loss.png" class="rounded" style="max-height:360px;filter:invert(1) hue-rotate(180deg) brightness(0.85)" />
+</div>
+
+---
+
 # What the Poincaré Feature Adds
 
 <v-click>
@@ -470,6 +478,14 @@ The model can't easily learn HRV dynamics from raw PPG alone — the CNN downsam
 # Proposed Architecture: PapaGei
 
 <PapaGeiViz />
+
+---
+
+# Preliminary Results: PapaGei
+
+<div class="flex justify-center mt-4">
+  <img src="/papagei_transformer_val_loss.png" class="rounded" style="max-height:360px;filter:invert(1) hue-rotate(180deg) brightness(0.85)" />
+</div>
 
 ---
 layout: center
