@@ -68,6 +68,14 @@ def load_papagei(weights_path: str = PAPAGEI_WEIGHTS) -> nn.Module:
     model = load_model_without_module_prefix(model, weights_path)
     for param in model.parameters():
         param.requires_grad = False
+
+    # Unfreeze the last 2 blocks of PaPaGei
+    # Frozen layers might not be working with our data
+    # Unfreeze some to help with overfitting
+    for name, param in model.named_parameters():
+        if "layer3" in name or "layer4" in name:
+            param.requires_grad = True
+
     model.eval()
     return model
 
@@ -310,10 +318,34 @@ if __name__ == "__main__":
     model.to(device)
 
     # Only the projection layer and transformer are trained;
-    # PaPaGei weights are frozen inside PaPaGeiPPGEncoder
+    # Most PaPaGei weights are frozen inside PaPaGeiPPGEncoder
+    # Higher learning rate for unfrozen layers
+
+    UNFREEZE_KEYWORDS = (
+        "basicblock_list.16",
+        "basicblock_list.17",
+        "final_bn",
+        "expert_layers_1",
+        "expert_layers_2",
+        "gating_network_1",
+        "gating_network_2",
+    )
+
+    papagei_params = [
+        p for n, p in model.ppg_encoder.encoder.named_parameters()
+        if p.requires_grad
+    ]
+    other_params = [
+        p for n, p in model.named_parameters()
+        if p.requires_grad and not any(
+            n.startswith(f"ppg_encoder.encoder.{k}") for k in UNFREEZE_KEYWORDS
+        )
+    ]
     optimizer = optim.Adam(
-        filter(lambda p: p.requires_grad, model.parameters()),
-        lr=3e-5,
+        [
+            {"params": papagei_params, "lr": 1e-6},   # Don't destroy pretrained weights
+            {"params": other_params,   "lr": 3e-5},   # Mess with only unfrozen ones
+        ],
         weight_decay=1e-3, # Increasing weight decay to help with overfitting (hopefully)
     )
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(
@@ -322,7 +354,7 @@ if __name__ == "__main__":
     criterion = nn.HuberLoss()
     # criterion = nn.CrossEntropyLoss()
     NUM_EPOCHS = 100
-    EARLY_STOP_PATIENCE = 25
+    EARLY_STOP_PATIENCE = 50
 
     trace = {"train_loss": [], "val_loss": []}
     best_val_loss = float("inf")
