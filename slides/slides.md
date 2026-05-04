@@ -81,40 +81,51 @@ This is the harder, more clinically meaningful problem.
 
 # How We Got Here
 
+<!--
+Learning normal morphology with DL is already hard enough, and framing the problem this way made it even harder.
+-->
+
+<div class="grid grid-cols-2 gap-8 mt-3">
+<div>
+
 <v-click>
 
-We initially framed BP prediction as a **classification problem** — predicting a category like normal, elevated, or hypertensive stage 1/2.
+We initially regressed the full **ABP waveform** and applied an if-else threshold to classify patients as normotensive or hypertensive.
 
 </v-click>
 
 <v-click>
 
-It felt natural: these are the clinically-used thresholds, and classification is easier to reason about than regression on a continuous physiological signal.
+This pipeline was opaque — waveform errors and threshold sensitivity compounded, and the final label told you nothing about how far off the model was.
 
 </v-click>
 
 <v-click>
 
-**Reading the PulseDB paper changed that.**
-
-The paper provides direct MAE benchmarks on continuous SBP and DBP regression, evaluated calibration-free on unseen subjects. That's a clear, quantitative target with an existing baseline to beat.
-
-</v-click>
-
-<v-click>
-
-**Why regression is the right framing:**
+**Reading the PulseDB paper revealed a simpler target:** regress SBP and DBP directly — no waveform, no thresholding, no category collapse.
 
 </v-click>
 
 <v-clicks>
 
-- Classification throws away resolution — a model predicting 139 mmHg vs 141 mmHg gets penalized the same as one predicting 100 mmHg
-- Category boundaries are arbitrary from a model's perspective; the underlying signal is continuous
-- MAE in mmHg is interpretable and directly comparable to clinical standards (AAMI: ±5 mmHg mean error)
-- The benchmark exists — regression on mmHg is both more honest and more competitive
+- Waveform + if-else is a strictly harder pipeline with more failure modes
+- MAE in mmHg is interpretable and comparable to clinical standards (AAMI: ±5 mmHg)
+- The benchmark exists — regression is both more honest and more competitive
 
 </v-clicks>
+
+</div>
+<div>
+
+<v-click>
+
+<img src="/confusion_matrix.png" class="w-full rounded" style="filter:invert(1) hue-rotate(180deg) brightness(0.85)" />
+<p class="text-xs mt-1 opacity-60 text-center">67% of hypertensive cases misclassified as normal — the if-else threshold obscures what the model actually learned</p>
+
+</v-click>
+
+</div>
+</div>
 
 ---
 
