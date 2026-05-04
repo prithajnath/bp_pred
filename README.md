@@ -154,3 +154,9 @@ Params size (MB): 3.94
 Estimated Total Size (MB): 840.33
 =========================================================================================================
 ```
+
+## Foundation Transformer Model
+
+The `data_loader.py` file was adjusted in the `foundation_transformer` branch to load data into the foundation model. The initial 15,000 sample PPG sequence is split into 12 non-overlapping windows that are 10 seconds each. Each window is passed through PaPaGei-S, a pretrained 1D ResNet from [this paper](https://arxiv.org/pdf/2410.20542). Each embedding gives us 12 tokens total. 
+
+The second input stream is the same as before, being 4 Poincaré plots.
