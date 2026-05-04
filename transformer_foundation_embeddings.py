@@ -354,7 +354,7 @@ if __name__ == "__main__":
     criterion = nn.HuberLoss()
     # criterion = nn.CrossEntropyLoss()
     NUM_EPOCHS = 100
-    EARLY_STOP_PATIENCE = 50
+    EARLY_STOP_PATIENCE = 25
 
     trace = {"train_loss": [], "val_loss": []}
     best_val_loss = float("inf")
@@ -362,10 +362,8 @@ if __name__ == "__main__":
 
     for epoch in range(NUM_EPOCHS):
         model.train()
-        # Keep PaPaGei in eval mode throughout — it's frozen and contains
-        # BatchNorm layers that should use their running statistics, not
-        # batch statistics, during fine-tuning
-        model.ppg_encoder.encoder.eval()
+        # Since part of PaPaGei is unfrozen, don't eval yet
+        # model.ppg_encoder.encoder.eval()
 
         running_loss = 0.0
 
