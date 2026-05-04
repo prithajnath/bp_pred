@@ -1,0 +1,464 @@
+---
+theme: seriph
+title: Cuff-less Blood Pressure Prediction from PPG
+info: |
+  Blood pressure prediction from photoplethysmography using a dual-stream transformer with Poincaré plot features.
+class: text-center
+drawings:
+  persist: false
+transition: slide-left
+fonts:
+  sans: Space Mono
+  mono: Space Mono
+  provider: google
+background: /bg.gif
+---
+
+# Cuff-less Blood Pressure Prediction
+
+From PPG signals using a dual-stream transformer
+
+<div class="abs-br m-6 text-sm opacity-50">
+  Prithaj Nath, Alex Stute · 2026
+</div>
+
+---
+
+# The Problem
+
+<v-click>
+
+Blood pressure (BP) is a key cardiovascular health marker — but traditional measurement requires a cuff.
+
+</v-click>
+
+<div class="grid grid-cols-2 gap-8 mt-4">
+<div>
+
+<v-click>
+
+**Goal:** predict systolic (SBP) and diastolic (DBP) blood pressure continuously from a **photoplethysmogram (PPG)** — a wearable optical signal.
+
+</v-click>
+
+**Why it's hard:**
+<v-clicks>
+
+- BP varies across individuals in ways that aren't fully encoded in PPG morphology
+- Models that see a subject at training time perform far better than on unseen subjects (**calibration gap**)
+- Most prior work used inconsistent, messy datasets, making comparisons unfair
+
+</v-clicks>
+
+</div>
+<div>
+
+<v-click>
+
+**Our framing:**
+> Calibration-free prediction — no subject in the training set appears in the test set.
+
+</v-click>
+
+<v-click>
+
+This is the harder, more clinically meaningful problem.
+
+</v-click>
+
+**Benchmark** (PulseDB paper RNN):
+<v-clicks>
+
+- SBP MAE: 14.39 mmHg
+- DBP MAE: 6.57 mmHg
+
+</v-clicks>
+
+</div>
+</div>
+
+---
+
+# How We Got Here
+
+<v-click>
+
+We initially framed BP prediction as a **classification problem** — predicting a category like normal, elevated, or hypertensive stage 1/2.
+
+</v-click>
+
+<v-click>
+
+It felt natural: these are the clinically-used thresholds, and classification is easier to reason about than regression on a continuous physiological signal.
+
+</v-click>
+
+<v-click>
+
+**Reading the PulseDB paper changed that.**
+
+The paper provides direct MAE benchmarks on continuous SBP and DBP regression, evaluated calibration-free on unseen subjects. That's a clear, quantitative target with an existing baseline to beat.
+
+</v-click>
+
+<v-click>
+
+**Why regression is the right framing:**
+
+</v-click>
+
+<v-clicks>
+
+- Classification throws away resolution — a model predicting 139 mmHg vs 141 mmHg gets penalized the same as one predicting 100 mmHg
+- Category boundaries are arbitrary from a model's perspective; the underlying signal is continuous
+- MAE in mmHg is interpretable and directly comparable to clinical standards (AAMI: ±5 mmHg mean error)
+- The benchmark exists — regression on mmHg is both more honest and more competitive
+
+</v-clicks>
+
+---
+
+# Dataset: PulseDB
+
+<v-click>
+
+Wang et al. 2023 — *Frontiers in Digital Health*
+
+</v-click>
+
+<div class="grid grid-cols-2 gap-8 mt-4">
+<div>
+
+<v-click>
+
+**What it is:**  
+5,245,454 cleaned 10-second segments of PPG + ECG + arterial BP waveforms from **5,361 subjects** across MIMIC-III and VitalDB.
+
+</v-click>
+
+**Why it matters:**
+<v-clicks>
+
+- Largest cleaned dataset for cuff-less BP benchmarking
+- Subject IDs included → enables calibration-free splits
+- Meets AAMI standard requirements (>85 subjects in test, >5% low/high BP range)
+- Beat-to-beat characteristic points included
+
+</v-clicks>
+
+</div>
+<div>
+
+<v-click>
+
+**Our subset:** VitalDB segments (ICU surgical patients)
+
+</v-click>
+
+**Calibration-free split:**
+<v-clicks>
+
+- Training subjects: 2,506
+- Test subjects: 279 (completely disjoint)
+- 2-minute windows of PPG, sampled at 125 Hz
+
+</v-clicks>
+
+**BP distribution:**
+<v-clicks>
+
+- SBP: 121.42 ± 22.10 mmHg
+- DBP: 61.87 ± 13.01 mmHg
+
+</v-clicks>
+
+</div>
+</div>
+
+---
+
+# Why 2-Minute Windows?
+
+<v-click>
+
+A **10-second** window captures heartbeat morphology — but blood pressure is regulated by the autonomic nervous system over much longer timescales.
+
+</v-click>
+
+<div class="grid grid-cols-2 gap-6 mt-3">
+<div>
+
+<div class="text-xs opacity-50 mb-1">anatomy of a single PPG pulse</div>
+
+<svg viewBox="0 0 390 165" class="w-full">
+  <line x1="30" y1="120" x2="360" y2="120" stroke="#444" stroke-width="0.5"/>
+  <v-click><path class="ppg-wave" d="M 40,120 C 50,120 70,25 110,25 C 148,25 165,77 200,77 C 215,77 225,63 240,63 C 280,63 310,120 340,120"
+    fill="none" stroke="#c0524a" stroke-width="2.5" stroke-linecap="round"/></v-click>
+  <g v-click>
+    <circle cx="110" cy="25" r="4" fill="#c0524a"/>
+    <line x1="110" y1="21" x2="110" y2="13" stroke="#888" stroke-width="1" stroke-dasharray="2,2"/>
+    <text x="110" y="12" style="font-size:9px;font-family:monospace" fill="#ddd" dominant-baseline="auto" text-anchor="middle">systolic peak</text>
+  </g>
+  <g v-click>
+    <circle cx="200" cy="77" r="4" fill="none" stroke="#f0c060" stroke-width="1.5"/>
+    <line x1="204" y1="80" x2="228" y2="97" stroke="#f0c060" stroke-width="1"/>
+    <text x="230" y="101" style="font-size:9px;font-family:monospace" fill="#f0c060" dominant-baseline="hanging">dicrotic notch</text>
+  </g>
+  <g v-click>
+    <circle cx="240" cy="63" r="4" fill="none" stroke="#6aabff" stroke-width="1.5"/>
+    <line x1="244" y1="60" x2="262" y2="47" stroke="#6aabff" stroke-width="1"/>
+    <text x="264" y="47" style="font-size:9px;font-family:monospace" fill="#6aabff" dominant-baseline="middle">diastolic wave</text>
+  </g>
+  <g v-click>
+    <line x1="40" y1="138" x2="340" y2="138" stroke="#666" stroke-width="1"/>
+    <line x1="40" y1="133" x2="40" y2="143" stroke="#666" stroke-width="1"/>
+    <line x1="340" y1="133" x2="340" y2="143" stroke="#666" stroke-width="1"/>
+    <text x="190" y="155" style="font-size:8px;font-family:monospace" fill="#888" text-anchor="middle">one cardiac cycle (~860ms @ 70 bpm)</text>
+  </g>
+</svg>
+
+</div>
+<div>
+
+<v-click>
+<div class="text-xs opacity-50 mb-1">amplitude modulation across beats — Mayer waves</div>
+</v-click>
+
+<v-click>
+<svg viewBox="0 0 415 120" class="w-full">
+  <line x1="5" y1="105" x2="410" y2="105" stroke="#444" stroke-width="0.5"/>
+  <!-- 8 beats with sinusoidally modulated amplitude -->
+  <path class="mayer-wave" d="M 5,105 C 8,105 12,25 17,25 C 23,25 27,67 32,67 C 36,67 38,57 41,57 C 49,57 53,105 55,105 C 58,105 62,18 67,18 C 73,18 77,63 82,63 C 86,63 88,53 91,53 C 99,53 103,105 105,105 C 108,105 112,32 117,32 C 123,32 127,70 132,70 C 136,70 138,61 141,61 C 149,61 153,105 155,105 C 158,105 162,55 167,55 C 173,55 177,81 182,81 C 186,81 188,75 191,75 C 199,75 203,105 205,105 C 208,105 212,72 217,72 C 223,72 227,89 232,89 C 236,89 238,85 241,85 C 249,85 253,105 255,105 C 258,105 262,62 267,62 C 273,62 277,84 282,84 C 286,84 288,79 291,79 C 299,79 303,105 305,105 C 308,105 312,38 317,38 C 323,38 327,73 332,73 C 336,73 338,65 341,65 C 349,65 353,105 355,105 C 358,105 362,22 367,22 C 373,22 377,65 382,65 C 386,65 388,55 391,55 C 399,55 403,105 405,105"
+    fill="none" stroke="#c0524a" stroke-width="1.8" stroke-linecap="round"/>
+  <!-- slow envelope through systolic peaks -->
+  <path class="mayer-envelope" d="M 17,25 C 42,22 42,18 67,18 C 92,18 92,32 117,32 C 142,32 142,55 167,55 C 192,55 192,72 217,72 C 242,72 242,62 267,62 C 292,62 292,38 317,38 C 342,38 342,22 367,22"
+    fill="none" stroke="#f0c06080" stroke-width="1.5" stroke-dasharray="4,3"/>
+  <!-- Mayer wave annotation -->
+  <text x="190" y="14" style="font-size:8px;font-family:monospace" fill="#f0c060" text-anchor="middle" dominant-baseline="middle">Mayer wave envelope (~10–25s period)</text>
+  <line x1="67" y1="16" x2="190" y2="16" stroke="#f0c06060" stroke-width="0.8"/>
+  <line x1="317" y1="16" x2="190" y2="16" stroke="#f0c06060" stroke-width="0.8"/>
+</svg>
+</v-click>
+
+<v-click>
+<p class="text-xs mt-2 opacity-80">The slow envelope is the <strong>LF HRV band</strong> (0.04–0.15 Hz) — baroreceptor feedback modulating heart rate in sync with blood pressure. One full cycle takes 7–25 seconds. You need at least 2 minutes to capture enough cycles for the model to use it.</p>
+</v-click>
+
+</div>
+</div>
+
+---
+
+# Poincaré Plots as a Second Input
+
+<v-click>
+
+Encoding sympatho-vagal balance from RR-interval dynamics.
+
+</v-click>
+
+<div class="grid grid-cols-2 gap-8 mt-4">
+<div>
+
+<v-click>
+
+A **Poincaré plot** plots each RR interval against the next one. Its shape encodes:
+
+</v-click>
+
+<v-clicks>
+
+- SD1 (short-term HRV) → parasympathetic activity
+- SD2 (long-term HRV) → sympathetic activity
+
+</v-clicks>
+
+<v-click>
+
+**Our approach:** 4 plots, one per 30-second sub-window of the 2-minute input. Each plot is a **32×32 density histogram** of successive RR intervals.
+
+</v-click>
+
+</div>
+<div>
+
+<v-click>
+
+<img src="/poincare_example.png" class="w-full rounded" style="filter:invert(1) hue-rotate(180deg) brightness(0.85)" />
+
+</v-click>
+
+<v-click>
+
+<p class="text-xs mt-2 opacity-70">Comet (healthy), torpedo, and complex patterns encode distinct sympatho-vagal states — the CNN learns to distinguish these directly from the density histogram. Adapted from Woo et al. (1992).</p>
+
+</v-click>
+
+</div>
+</div>
+
+---
+
+# NLD Transformer Architecture
+
+<ArchViz />
+
+---
+
+# Results
+
+<table class="w-full mt-4" style="border-collapse:collapse;font-family:monospace;font-size:0.82em">
+  <thead>
+    <tr style="border-bottom:1px solid #444;color:#888">
+      <th style="text-align:left;padding:6px 10px;font-weight:normal">Model</th>
+      <th style="text-align:right;padding:6px 10px;font-weight:normal">SBP MAE (mmHg)</th>
+      <th style="text-align:right;padding:6px 10px;font-weight:normal">DBP MAE (mmHg)</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr v-click style="color:#666">
+      <td style="padding:5px 10px">LSTM (PPG only)</td>
+      <td style="text-align:right;padding:5px 10px">20.54 ± 11.52</td>
+      <td style="text-align:right;padding:5px 10px">15.88 ± 8.70</td>
+    </tr>
+    <tr v-click style="color:#888">
+      <td style="padding:5px 10px">Basic Transformer (PPG only)</td>
+      <td style="text-align:right;padding:5px 10px">15.35 ± 9.70</td>
+      <td style="text-align:right;padding:5px 10px">9.38 ± 5.40</td>
+    </tr>
+    <tr v-click style="color:#666;border-top:1px dashed #333">
+      <td style="padding:5px 10px">Paper RNN baseline (PPG only)</td>
+      <td style="text-align:right;padding:5px 10px">14.39</td>
+      <td style="text-align:right;padding:5px 10px">6.57</td>
+    </tr>
+    <tr v-click class="nld-row">
+      <td style="padding:6px 10px;font-weight:bold">NLD Transformer (PPG + Poincaré)</td>
+      <td style="text-align:right;padding:6px 10px;font-weight:bold">14.07 ± 9.37 ✓</td>
+      <td style="text-align:right;padding:6px 10px;font-weight:bold">7.75 ± 5.84</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="grid grid-cols-2 gap-8 mt-6">
+<div>
+
+<v-click>
+
+**SBP: beat the benchmark**  
+14.07 vs 14.39 mmHg — the NLD transformer outperforms the paper's RNN on systolic prediction, despite being calibration-free and trained on a subset of the data.
+
+</v-click>
+
+</div>
+<div>
+
+<v-click>
+
+**DBP: close but not there**  
+7.75 vs 6.57 mmHg — diastolic error is ~18% higher than the benchmark. Diastolic BP has smaller variance, making it harder to track across unseen subjects.
+
+</v-click>
+
+</div>
+</div>
+
+---
+
+# What the Poincaré Feature Adds
+
+<v-click>
+
+Ablation: Basic Transformer vs NLD Transformer
+
+</v-click>
+
+<div class="grid grid-cols-2 gap-8 mt-6">
+<div>
+
+<v-click>
+
+**SBP improvement:**  
+15.35 → 14.07 mmHg  
+**−1.28 mmHg (−8.4%)**
+
+</v-click>
+
+<v-click>
+
+**DBP improvement:**  
+9.38 → 7.75 mmHg  
+**−1.63 mmHg (−17.4%)**
+
+</v-click>
+
+<v-click>
+
+The Poincaré feature helps more on DBP — consistent with the physiological story: sympatho-vagal balance has a stronger connection to diastolic than systolic pressure.
+
+</v-click>
+
+</div>
+<div>
+
+<v-click>
+
+**Why it works:**
+
+The model can't easily learn HRV dynamics from raw PPG alone — the CNN downsampler discards fine temporal structure. The Poincaré plots encode this information explicitly as a structured image, processed by a dedicated CNN before fusion.
+
+</v-click>
+
+<v-click>
+
+This is **architecture-level feature engineering** grounded in cardiovascular physiology.
+
+</v-click>
+
+</div>
+</div>
+
+---
+layout: center
+class: text-center
+---
+
+# Key Takeaways
+
+<div class="grid grid-cols-3 gap-6 mt-8 text-left">
+
+<v-click>
+<div class="p-4 border border-primary/30 rounded-lg bg-primary/5">
+
+**2-minute windows**  
+Capture autonomic nervous system dynamics invisible in shorter segments — necessary for calibration-free generalization.
+
+</div>
+</v-click>
+
+<v-click>
+<div class="p-4 border border-primary/30 rounded-lg bg-primary/5">
+
+**Poincaré plots**  
+Encoding sympatho-vagal balance as a second input stream gives the transformer a physiological prior it can't learn from raw PPG.
+
+</div>
+</v-click>
+
+<v-click>
+<div class="p-4 border border-primary/30 rounded-lg bg-primary/5">
+
+**Calibration-free**  
+No subject overlap between train and test. A harder, more realistic protocol — and we still beat the SBP benchmark.
+
+</div>
+</v-click>
+
+</div>
+
+<v-click>
+
+<div class="mt-10 text-sm opacity-60">
+  PulseDB · Wang et al. 2023 · Frontiers in Digital Health
+</div>
+
+</v-click>
